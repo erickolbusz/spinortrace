@@ -43,6 +43,12 @@ If the trace includes a (non-perp) $\gamma^\mu$ and $\gamma^\nu$ that are contra
 ## Quirks/Bugs
 
 - Currently wildcard indices are only useful for gluon propagators. They are not fully supported for use with `guppers` or `glowers` (though the code is technically there already). This shouldn't matter because currently the only non-perp metric tensors being contracted is $g_{\mu\nu}$.
+- Sometimes a dot product will not have a `\cdot` between the two terms, see for example the second term in the last example shown here. Any product of two perp vectors should always be interpreted as a normal cartesian dot product i.e.
+
+```math
+(k_{\perp} + p_{2\perp})(l_{\perp} - p_{1\perp}) \equiv (k_{\perp} + p_{2\perp})\cdot (l_{\perp} - p_{1\perp}) \equiv +(k_{\perp_1} + p_{2\perp_1})(l_{\perp_1} - p_{1\perp_1}) + (k_{\perp_2} + p_{2\perp_2})(l_{\perp_2} - p_{1\perp_2})
+```
+
 
 ---
 
