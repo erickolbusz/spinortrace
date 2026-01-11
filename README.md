@@ -69,12 +69,12 @@ With 4-vectors and mu-nu contraction:
 \textrm{tr}\,\left[\gamma^+\gamma^\mu k\!\!\!\!/ l\!\!\!\!\!\:/ \gamma^\nu \gamma^-\right]g_{\mu\nu} = -16(l_{\perp}\cdot k_{\perp}) + 16k^+p_2^-y
 ```
 
-With 4-vectors, mu-nu contraction, and a gluon propagator, diagram 12b
+With 4-vectors, mu-nu contraction, and a gluon propagator, diagram 12b:
 
 `fulltrace(['-','?\\beta',lv-p1v,NULABEL,p2v+kv,'-','+','-',p2v+kv,MULABEL,lv-p1pv,'?\\gamma'], Gterms=[ (lv,('?\\gamma','?\\beta')) ])`
 ```math
 \begin{align}
 &\textrm{tr}\,\left[\gamma^-\gamma^{\beta}(l\!\!\!\!\!\:/-p_1\!\!\!\!\!\!\!/)\gamma^\nu(p_2\!\!\!\!\!\!\!/+k\!\!\!\!/)\gamma^-\gamma^+\gamma^-(p_2\!\!\!\!\!\!\!/+k\!\!\!\!/)\gamma^\mu(l\!\!\!\!\!\:/-p_1'\!\!\!\!\!\!\!/\gamma^\gamma) \right]G_{\gamma\beta}(l) g_{\mu\nu} \\
-&\hspace{10em}= -64(p_2^-)^2y^2(k_{\perp} + p_{2\perp})^2 + 128(p_2^-)^2y(k_{\perp} + p_{2\perp})(l_{\perp} - p_{1\perp}) - 64(p_2^-)^2(l_{\perp} - p_{1\perp})^2
+&\hspace{30em}= -64(p_2^-)^2y^2(k_{\perp} + p_{2\perp})^2 + 128(p_2^-)^2y(k_{\perp} + p_{2\perp})(l_{\perp} - p_{1\perp}) - 64(p_2^-)^2(l_{\perp} - p_{1\perp})^2
 \end{align}
 ```
