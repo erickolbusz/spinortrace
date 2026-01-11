@@ -4,7 +4,68 @@ import itertools
 MULABEL = "MU"
 NULABEL = "NU"
 
-#----------------------------------- helpers
+#=================================================================================================
+# 4-VECTORS
+#=================================================================================================
+
+class lcvec:
+    def __init__(self,plus,minus,perp):
+        self.__plus = plus
+        self.__perp = perp
+        self.__minus = minus
+
+    def __add__(self,vec2):
+        return lcvec(self.__plus + vec2.__plus,
+                     self.__minus + vec2.__minus,
+                     self.__perp + vec2.__perp)
+
+    def __sub__(self,vec2):
+        return lcvec(self.__plus - vec2.__plus,
+                     self.__minus - vec2.__minus,
+                     self.__perp - vec2.__perp)
+
+    def getplus(self):
+        return self.__plus
+    def getminus(self):
+        return self.__minus
+    def getperp(self):
+        return self.__perp
+    def geti(self,i):
+        return [self.__plus, self.__minus, self.__perp][i]
+
+    def pprint(self):
+        #return "<"+self.__plus+", "+self.__minus+", "+self.__perp+">"
+        return "<%s, %s, %s>"%(self.__plus, self.__minus, self.__perp)
+
+#the actual variables
+p1, p1p, p1perp = symbols("p_1^+ p_1^{'+} p_{1\\perp}")
+p2, y, p2perp = symbols("p_2^- y p_{2\\perp}")
+lm, lperp = symbols("l^- l_{\\perp}")
+kp, kperp = symbols("k^+ k_{\\perp}")
+k1p, k1perp = symbols("k_1^+ k_{1\\perp}")
+k2p, k2perp = symbols("k_2^+ k_{2\\perp}")
+
+#these only exist to format the perp contractions and output text
+lperpstr, kperpstr, k1perpstr, k2perpstr = symbols('l_{\\perp} k_{\\perp} k_{1\\perp} k_{2\\perp}')
+lperpsq, kperpsq, k1perpsq, k2perpsq = symbols('l_{\\perp}^2 k_{\\perp}^2 k_{1\\perp}^2 k_{2\\perp}^2')
+lperpdotkperp, lperpdotk1perp, lperpdotk2perp, k1perpdotk2perp = symbols('(l_{\\perp}\\cdot\\~k_{\\perp}) (l_{\\perp}\\cdot\\~k_{1\\perp}) (l_{\\perp}\\cdot\\~k_{2\\perp}) (k_{1\\perp}\\cdot\\~k_{2\\perp})')
+
+
+p2v = lcvec(0,p2,p2perp)
+p1v = lcvec(p1,0,p1perp)
+p1pv = lcvec(p1p,0,p1perp)
+
+lv = lcvec(lperp*lperp/(2*lm),lm,lperp)
+
+kv = lcvec(kp,0,kperp)
+k1v = lcvec(k1p,0,k1perp)
+k2v = lcvec(k2p,0,k2perp)
+
+
+#=================================================================================================
+# HELPERS
+#=================================================================================================
+
 def isgammaplus(g):
     return g == "+"
 def isgammaminus(g):
@@ -18,6 +79,129 @@ def ismu(g):
 def isnu(g):
 	return g == NULABEL
 
+def combineetas(uppers,lowers):
+    def is4dindex(index):
+        return index[0]=="?"
+    def perpfrom4d(index):
+        return index[1:]
+    def issameindex(a,b):
+        return a==b or (is4dindex(a) and perpfrom4d(a)==b) or (is4dindex(b) and perpfrom4d(b)==a)
+
+    #uppers is a list of g^{a b}s
+    #lowers is a list of g_{a b}s
+    #in actual practical use everything is a perp index
+    #but it's not hard to include normal 4-vector index structure here so I do
+    #these have a ? as a prefix to show they're actual proper 4-vector labels
+    #the ? is removed when applicable to "cast" them to perps
+    #e.g. g^{?mu perpa} = g^{perpmu perpa}
+    #the only time this WOULDN'T happen is when we have a g^{mu nu} g_{mu nu} = 4
+
+    #need the possibility of having a g^{a}_{b}
+    def makegperp(uppers,lowers):
+        assert len(uppers)+len(lowers)==2
+
+        #if one index is a full 4-vector index but the other is just perp
+        #then the 4-vector index is downgraded to a perp index
+        #since g^{+ perp} = g^{- perp} = 0
+        has4dindex = False
+        all4dindex = True
+        for index in uppers:
+            if is4dindex(index):
+                has4dindex = True
+            else:
+                all4dindex = False
+        for index in lowers:
+            if is4dindex(index):
+                has4dindex = True
+            else:
+                all4dindex = False
+        if has4dindex and (not all4dindex):
+            #replace 4d with perp
+            uppers = [perpfrom4d(index) if is4dindex(index) else index for index in uppers]
+            lowers = [perpfrom4d(index) if is4dindex(index) else index for index in lowers]
+
+        return [uppers,lowers]
+
+    #make all of them the standard form first
+    allgs = []
+    for gperp in uppers:
+        allgs.append(makegperp([i for i in gperp],[]))
+    for gperp in lowers:
+        allgs.append(makegperp([],[i for i in gperp]))
+
+    #find the repeated indices to contract
+    lowerindices = [index for gperp in lowers for index in gperp]
+    upperindices = [index for gperp in uppers for index in gperp]
+    repeatedindices = [i for i in lowerindices for j in upperindices if issameindex(i,j)]
+
+    coeff = 1
+    while len(repeatedindices) > 0: #take care of one repeated index
+        # print("ALLGS",allgs)
+        # print("REPEATED",repeatedindices)
+
+        currindex = repeatedindices[0]
+
+        #find currindex
+        uppergi = -1
+        lowergi = -1
+        for gi in range(len(allgs)):
+            currg = allgs[gi]
+            if currindex in currg[0]:
+                uppergi = gi
+            if currindex in currg[1]:
+                lowergi = gi
+
+        if lowergi == uppergi: #they're in the same term
+            if is4dindex(currindex):
+                # print("\tFOUND A G^MU_MU")
+                #we have a g^{mu}_{mu} = 4
+                coeff *= 4
+            else:
+                # print("\tFOUND A G^A_A")
+                #we have a g^{perpa}_{perpa} = 2
+                coeff *= 2
+            allgs.pop(lowergi)
+        else: #contracting two gs
+            g1 = allgs[lowergi] #has a _{a}
+            g2 = allgs[uppergi] #has a ^{a}
+            # print("\tCONTRACTING",g1,g2)
+
+            newg = makegperp(g1[0]+[i for i in g2[0] if not issameindex(i,currindex)] , [i for i in g1[1] if not issameindex(i,currindex)]+g2[1])
+
+            allgs.pop(max(lowergi,uppergi))
+            allgs.pop(min(lowergi,uppergi))
+            allgs.append(newg)
+
+        #recompute what we still need to do
+        upperindices = [index for gperp in allgs for index in gperp[0]]
+        lowerindices = [index for gperp in allgs for index in gperp[1]]
+        repeatedindices = [i for i in lowerindices for j in upperindices if issameindex(i,j)]
+
+    # print("AT THE END:",coeff,allgs)
+    retguppers = []
+    retglowers = []
+    retguplows = []
+
+    for eta in allgs:
+        if len(eta[1]) == 0:
+            retguppers.append(eta[0])
+        elif len(eta[0]) == 0:
+            retglowers.append(eta[1])
+        else:
+            retguplows.append(eta)
+            print("there's a metric tensor with one upstairs and one downstairs index you should actually code that part now")
+
+    return {
+        "coeff": coeff,
+        "guppers": retguppers,
+        "glowers": retglowers,
+        "guplows": retguplows
+    }
+
+
+#=================================================================================================
+# TRACE OF GAMMA MATRICES
+#=================================================================================================
 
 #----------------------------------- permutation math
 def allowed_permutation_generator(N):
@@ -58,34 +242,7 @@ def permutation_sign(perm):
                 even_cycles += 1
     return (-1)**even_cycles
 
-
-#----------------------------------- output formatting
-# def make_term(alphabet,perm,coeff):
-#     #goes from e.g. "abcd" and [0,3,1,2] to + \eta^{\perp a \perp d}\eta^{\perp b \perp c}
-#     #or if verbose is turned off, +(ad)(bc)
-    
-#     if coeff==0:
-#         return ""
-
-#     if coeff>0:
-#         retstr = " + %d"%coeff
-#     else:
-#         retstr = " - %d"%abs(coeff)
-#     if abs(coeff) == 1:
-#         retstr = retstr[:-1]
-        
-#     for i in range(0,len(perm)-1,2):
-#         alphi = alphabet[perm[i]]
-#         alphj = alphabet[perm[i+1]]
-#         if VERBOSE:
-#             retstr += verbose_eta(alphi,alphj)
-#         else:
-#             retstr += plain_eta(alphi,alphj)
-
-#     return retstr
-
-
-#----------------------------------- main
+#----------------------------------- trace of list of gamma matrices
 def trace(gammas,symmetries=[]):
     #gammas is a string or list of all indices with whatever names you give them
     # "+" is gamma^+
@@ -224,7 +381,6 @@ def trace(gammas,symmetries=[]):
     return retdict
 
 
-
 # print(trace('i+-+-+gc-d',['cg']))
 # print(trace(['+','-','a','b','+','c','d','-']))
 # print(trace('+-ab+cd-'))
@@ -246,222 +402,9 @@ def trace(gammas,symmetries=[]):
 
 
 
-
-
-
-
-def combineetas(uppers,lowers):
-    def is4dindex(index):
-        return index[0]=="?"
-    def perpfrom4d(index):
-        return index[1:]
-    def issameindex(a,b):
-        return a==b or (is4dindex(a) and perpfrom4d(a)==b) or (is4dindex(b) and perpfrom4d(b)==a)
-
-    #uppers is a list of g^{a b}s
-    #lowers is a list of g_{a b}s
-    #in actual practical use everything is a perp index
-    #but it's not hard to include normal 4-vector index structure here so I do
-    #these have a ? as a prefix to show they're actual proper 4-vector labels
-    #the ? is removed when applicable to "cast" them to perps
-    #e.g. g^{?mu perpa} = g^{perpmu perpa}
-    #the only time this WOULDN'T happen is when we have a g^{mu nu} g_{mu nu} = 4
-
-    #need the possibility of having a g^{a}_{b}
-    def makegperp(uppers,lowers):
-        assert len(uppers)+len(lowers)==2
-
-        #if one index is a full 4-vector index but the other is just perp
-        #then the 4-vector index is downgraded to a perp index
-        #since g^{+ perp} = g^{- perp} = 0
-        has4dindex = False
-        all4dindex = True
-        for index in uppers:
-            if is4dindex(index):
-                has4dindex = True
-            else:
-                all4dindex = False
-        for index in lowers:
-            if is4dindex(index):
-                has4dindex = True
-            else:
-                all4dindex = False
-        if has4dindex and (not all4dindex):
-            #replace 4d with perp
-            uppers = [perpfrom4d(index) if is4dindex(index) else index for index in uppers]
-            lowers = [perpfrom4d(index) if is4dindex(index) else index for index in lowers]
-
-        return [uppers,lowers]
-
-    #make all of them the standard form first
-    allgs = []
-    for gperp in uppers:
-        allgs.append(makegperp([i for i in gperp],[]))
-    for gperp in lowers:
-        allgs.append(makegperp([],[i for i in gperp]))
-
-    #find the repeated indices to contract
-    lowerindices = [index for gperp in lowers for index in gperp]
-    upperindices = [index for gperp in uppers for index in gperp]
-    repeatedindices = [i for i in lowerindices for j in upperindices if issameindex(i,j)]
-
-    coeff = 1
-    while len(repeatedindices) > 0: #take care of one repeated index
-        # print("ALLGS",allgs)
-        # print("REPEATED",repeatedindices)
-
-        currindex = repeatedindices[0]
-
-        #find currindex
-        uppergi = -1
-        lowergi = -1
-        for gi in range(len(allgs)):
-            currg = allgs[gi]
-            if currindex in currg[0]:
-                uppergi = gi
-            if currindex in currg[1]:
-                lowergi = gi
-
-        if lowergi == uppergi: #they're in the same term
-            if is4dindex(currindex):
-                # print("\tFOUND A G^MU_MU")
-                #we have a g^{mu}_{mu} = 4
-                coeff *= 4
-            else:
-                # print("\tFOUND A G^A_A")
-                #we have a g^{perpa}_{perpa} = 2
-                coeff *= 2
-            allgs.pop(lowergi)
-        else: #contracting two gs
-            g1 = allgs[lowergi] #has a _{a}
-            g2 = allgs[uppergi] #has a ^{a}
-            # print("\tCONTRACTING",g1,g2)
-
-            newg = makegperp(g1[0]+[i for i in g2[0] if not issameindex(i,currindex)] , [i for i in g1[1] if not issameindex(i,currindex)]+g2[1])
-
-            allgs.pop(max(lowergi,uppergi))
-            allgs.pop(min(lowergi,uppergi))
-            allgs.append(newg)
-
-        #recompute what we still need to do
-        upperindices = [index for gperp in allgs for index in gperp[0]]
-        lowerindices = [index for gperp in allgs for index in gperp[1]]
-        repeatedindices = [i for i in lowerindices for j in upperindices if issameindex(i,j)]
-
-    # print("AT THE END:",coeff,allgs)
-    retguppers = []
-    retglowers = []
-    retguplows = []
-
-    for eta in allgs:
-        if len(eta[1]) == 0:
-            retguppers.append(eta[0])
-        elif len(eta[0]) == 0:
-            retglowers.append(eta[1])
-        else:
-            retguplows.append(eta)
-            print("there's a metric tensor with one upstairs and one downstairs index you should actually code that part now")
-
-    return {
-        "coeff": coeff,
-        "guppers": retguppers,
-        "glowers": retglowers,
-        "guplows": retguplows
-    }
-
-
-
-    # retdict = {
-    #     "overall_factor": overall_factor,
-    #     "terms": []
-    # }
-
-
-
-
-
-#----------------------------------- 4-vectors
-class lcvec:
-    def __init__(self,plus,minus,perp):
-        self.__plus = plus
-        self.__perp = perp
-        self.__minus = minus
-
-    def __add__(self,vec2):
-        return lcvec(self.__plus + vec2.__plus,
-                     self.__minus + vec2.__minus,
-                     self.__perp + vec2.__perp)
-
-    def __sub__(self,vec2):
-        return lcvec(self.__plus - vec2.__plus,
-                     self.__minus - vec2.__minus,
-                     self.__perp - vec2.__perp)
-
-    def getplus(self):
-        return self.__plus
-    def getminus(self):
-        return self.__minus
-    def getperp(self):
-        return self.__perp
-    def geti(self,i):
-        return [self.__plus, self.__minus, self.__perp][i]
-
-    def pprint(self):
-        #return "<"+self.__plus+", "+self.__minus+", "+self.__perp+">"
-        return "<%s, %s, %s>"%(self.__plus, self.__minus, self.__perp)
-
-#the actual variables
-p1, p1p, p1perp = symbols("p_1^+ p_1^{'+} p_{1\\perp}")
-p2, y, p2perp = symbols("p_2^- y p_{2\\perp}")
-lm, lperp = symbols("l^- l_{\\perp}")
-kp, kperp = symbols("k^+ k_{\\perp}")
-k1p, k1perp = symbols("k_1^+ k_{1\\perp}")
-k2p, k2perp = symbols("k_2^+ k_{2\\perp}")
-
-#these only exist to format the perp contractions and output text
-lperpstr, kperpstr, k1perpstr, k2perpstr = symbols('l_{\\perp} k_{\\perp} k_{1\\perp} k_{2\\perp}')
-lperpsq, kperpsq, k1perpsq, k2perpsq = symbols('l_{\\perp}^2 k_{\\perp}^2 k_{1\\perp}^2 k_{2\\perp}^2')
-lperpdotkperp, lperpdotk1perp, lperpdotk2perp, k1perpdotk2perp = symbols('(l_{\\perp}\\cdot\\~k_{\\perp}) (l_{\\perp}\\cdot\\~k_{1\\perp}) (l_{\\perp}\\cdot\\~k_{2\\perp}) (k_{1\\perp}\\cdot\\~k_{2\\perp})')
-
-
-p2v = lcvec(0,p2,p2perp)
-p1v = lcvec(p1,0,p1perp)
-p1pv = lcvec(p1p,0,p1perp)
-
-lv = lcvec(lperp*lperp/(2*lm),lm,lperp)
-
-kv = lcvec(kp,0,kperp)
-# k1v = lcvec(k1p,0,k1perp)
-# k2v = lcvec(k2p,0,k2perp)
-
-
-
-
-
-
-
-
-
-
-
-def go(indices):
-    muindex = indices.index(MULABEL)
-    nuindex = indices.index(NULABEL)
-    lindex = min(muindex,nuindex)
-    rindex = max(muindex,nuindex)
-    if rindex == lindex+2:
-        #gamma^mu gamma^A gamma_mu = -2gamma^A
-        return (-2, ("").join(indices[:lindex]+indices[lindex+1:rindex]+indices[rindex+1:]))
-    else:
-        #anticommute the one on the right towards the one on the left
-        #the g^{A nu} gets contracted with gamma^mu g_{mu nu} to change the gamma^mu to a gamma^A
-        firstterm = indices[:rindex-1]+indices[rindex+1:]
-        firstterm[lindex] = indices[rindex-1]
-        return (2, ("").join(firstterm), go(indices[:rindex-1]+indices[rindex-1:rindex+1][::-1]+indices[rindex+1:]))
-
-#print(go(['a','b','c',MULABEL,'d','e','f','g','h',NULABEL,'i','j']))
-
-
+#================================================================================================= 
+# MAIN
+#================================================================================================= 
 
 def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
     def fulltrace_helper(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
@@ -533,9 +476,6 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
                     elif label == Gterm[1][1]:
                         Gmunus[Gtermi][1] = 2
 
-            # plusterms = 1
-            # minusterms = 1
-            # Gfactors = []
             plusminusGfactors = 1
 
             for Gtermi in range(len(Gterms)):
@@ -543,31 +483,17 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
                 assert (-1 not in Gmunus[Gtermi])
                 if Gmunus[Gtermi] == [1,1]: #- -
                     val = (Gterm[0].getperp())**2
-                    # if len(val.as_terms()[0]) == 1: #it's already in the form of e.g. "l^2" or "(k_1 - l)^2" just throw the perp on
-                    #     val = "%s_{\\perp}"%str(val)
-                    # else:
-                    #     val = str(val)
-
-                    # Gfactors.append(val)
-                    # minusterms /= (Gterm[0].getminus())**2
                     plusminusGfactors *= (Gterm[0].getperp())**2 / (Gterm[0].getminus())**2                    
                 elif Gmunus[Gtermi] == [1,2]: #- perp
                     perpterms.append((Gterm[1][1], Gterm[0].getperp()))
-                    # minusterms /= Gterm[0].getminus()
-                    # Gfactors.append(1)
                     plusminusGfactors /= Gterm[0].getminus()
                 elif Gmunus[Gtermi] == [2,1]: #perp -
                     perpterms.append((Gterm[1][0], Gterm[0].getperp()))
-                    # minusterms /= Gterm[0].getminus()
-                    # Gfactors.append(1)
                     plusminusGfactors /= Gterm[0].getminus()
                 elif Gmunus[Gtermi] == [2,2]: #perp perp
-                    #Gfactors.append("g_{%s %s}"%(Gterm[1][0],Gterm[1][1]))
                     currglowers.append((Gterm[1][0],Gterm[1][1]))
-                    # Gfactors.append(-1)
                     plusminusGfactors *= -1
                 else: #everything else is zero
-                    # Gfactors.append(0)
                     plusminusGfactors = 0
 
             #find all pairwise symmetries in the perp components
@@ -606,14 +532,12 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
                         termguppers = [sorted(pair) for pair in combinedgs['guppers']]
                         termglowers = [sorted(pair) for pair in combinedgs['glowers']]
                         termguplows = [sorted(pair) for pair in combinedgs['guplows']]
-                        # print('hi',currguppers,'a',term[0],'b',currglowers,'c',termguppers)
 
                         #should have no free indices other than to contract with the vectors
                         assert (len(termglowers)==0) 
                         assert (len(termguplows)==0)
 
                         finalterm = currtrace['overall_factor'] * plusminusGfactors * term[1] * combinedgs['coeff']
-                        # print(termcoeff)
 
                         #do the contractions
                         #each adds a minus sign since eta^{perpa perpb} v_aperp w_bperp = -v_perp cdot w_perp
@@ -643,17 +567,11 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
                                 # (k2perp*k2perp, k2perpsq),
                             ]))
 
-                            # print('\t\t\t\t',dotprod)
                             finalterm *= -1
                             finalterm *= dotprod
 
-                            # print("!",term[1],dotprod)
-                        # print("!!",finalterm)
                         thistermtotal += finalterm
 
-                    # print("TOTAL FINAL SUM IS",thistermtotal)
-                    # print()
-                    # print()
                     finalanswer += thistermtotal
                     finalterms.append((possibleindices,thistermtotal))
                 else:
@@ -676,8 +594,6 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
                     finalanswer += finalterm
                     finalterms.append((possibleindices,finalterm))
 
-        # print("!!!!!!!!!!!!!!!!!")
-        # print(finalanswer)
         return {
             "allterms": finalterms,
             "answer": finalanswer
@@ -686,7 +602,7 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
     #======================================================================================
 
     def pprint(answer,ret=False):
-        #shoud maybe use a regex
+        #should maybe use a regex in the future
         try:
             answer = answer.subs(lm,y*p2)
         except AttributeError:
@@ -789,12 +705,6 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
         else:
             sumstr = sumstr[1:]
 
-        # print()
-        # print()
-        # qq = [subtrace[0] * subtrace[1]['answer'] for subtrace in allsubanswers]
-        # for q in qq:
-        #     print(q)
-        # print('\n\n')
         print(sumstr)
         overallsum = sum(subtrace[0] * subtrace[1]['answer'] for subtrace in allsubanswers)
         pprint(overallsum)
@@ -812,6 +722,8 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
         pprint(result['answer'])
 
 
+#=================================================================================================
+#=================================================================================================
 
 #10a
 fulltrace(["+","-",kv+p2v,"\\gamma",kv+p2v+p1pv,lv,kv+p2v+p1v,"\\beta",kv+p2v,"-"], glowers=[ ("\\gamma","\\beta") ])
@@ -823,20 +735,4 @@ fulltrace(["+","-",kv+p2v,"\\gamma",kv+p2v+p1pv,lv,kv+p2v+p1v,"\\beta",kv+p2v,"-
 #fulltrace(['-','?\\beta',lv-p1v,NULABEL,p2v+kv,'-','+','-',p2v+kv,MULABEL,lv-p1pv,'?\\gamma'], Gterms=[ (lv,('\\gamma','\\beta')) ])
 
 #15e
-fulltrace(['-',lv-kv-p2v,'?\\gamma',kv+p2v,'\\alpha','-','\\beta',kv+p2v,'?\\delta',lv-kv-p2v], Gterms=[ (lv,('\\delta','\\gamma')) ], glowers=[ ("\\alpha","\\beta") ])
-
-
-
-
-
-
-
-#fulltrace(["-",lv-kv-p2v,'?\\gamma',kv+p2v,'\\alpha','-','\\beta',kv+p2v,'?\\delta',lv-kv-p2v], Gterms=[ (lv,('\\delta','\\gamma')) ], glowers=[ ('\\alpha','\\beta') ])
-# fulltrace('+-+-',glowers=[ ("\\gamma","\\beta")],guppers=[ ("\\gamma","\\beta")])
-
-
-
-
-
-
-
+#fulltrace(['-',lv-kv-p2v,'?\\gamma',kv+p2v,'\\alpha','-','\\beta',kv+p2v,'?\\delta',lv-kv-p2v], Gterms=[ (lv,('\\delta','\\gamma')) ], glowers=[ ("\\alpha","\\beta") ])
