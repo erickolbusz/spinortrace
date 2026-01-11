@@ -83,13 +83,13 @@ def is4dindex(index):
     return index[0]=="?"
 def perpfrom4d(index):
     return index[1:]
-def sanitize(index):
+def sanitize4d(index):
     if is4dindex(index):
         return perpfrom4d(index)
     else:
         return index
 def issameindex(a,b):
-    return sanitize(a)==sanitize(b)
+    return sanitize4d(a)==sanitize4d(b)
 
 def combineetas(uppers,lowers):
     #uppers is a list of g^{a b}s
@@ -494,7 +494,7 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
                     perpterms.append((Gterm[1][0], Gterm[0].getperp()))
                     plusminusGfactors /= Gterm[0].getminus()
                 elif Gmunus[Gtermi] == [2,2]: #perp perp
-                    currglowers.append((Gterm[1][0][1:],Gterm[1][1][1:]))
+                    currglowers.append((sanitize4d(Gterm[1][0]),sanitize4d(Gterm[1][1])))
                     plusminusGfactors *= -1
                 else: #everything else is zero
                     plusminusGfactors = 0
@@ -549,9 +549,9 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
                             vec1 = None
                             vec2 = None
                             for vec in perpterms:
-                                if sanitize(vec[0]) == eta[0]:
+                                if sanitize4d(vec[0]) == eta[0]:
                                     vec1 = vec[1]
-                                elif sanitize(vec[0]) == eta[1]:
+                                elif sanitize4d(vec[0]) == eta[1]:
                                     vec2 = vec[1]
 
                             if not (vec1 and vec2):
