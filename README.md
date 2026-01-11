@@ -34,7 +34,7 @@ All gluon propagators are in the $A^- = 0$ gauge with $n^+ = 1$. The nonzero ter
 ```math
 G_{--}(l) = \frac{l_\perp^2}{(l^-)^2}\ ,\ G_{-\perp a}(l) = \frac{l_{\perp a}}{l^-}\ ,\ G_{\perp a\perp b}(l) = -g_{\perp a\perp b}\ .
 ```
-To properly include a gluon term, the associated indices in `terms` **must** start with a `?`, otherwise they will be considered to be perp indices and only G_{\perp\perp} will enter.
+To properly include a gluon term, the associated indices in `terms` **must** start with a `?`, otherwise they will be considered to be perp indices and only $G_{\perp\perp}$ will enter.
 
 ## $g_{\mu\nu}$ Contraction
 
@@ -66,7 +66,7 @@ With 4-vectors and mu-nu contraction:
 
 `fulltrace(['+',MULABEL,kv,lv,NULABEL,'-'])`
 ```math
-\textrm{tr}\,\left[\gamma^+\gamma^\mu k\!\!\!/ l\!\!\!/ \gamma^\nu \gamma^-\right]g_{\mu\nu} = -16(l_{\perp}\cdot k_{\perp}) + 16k^+p_2^-y
+\textrm{tr}\,\left[\gamma^+\gamma^\mu k\!\!\!\!/ l\!\!\!\!\!\:/ \gamma^\nu \gamma^-\right]g_{\mu\nu} = -16(l_{\perp}\cdot k_{\perp}) + 16k^+p_2^-y
 ```
 
 With 4-vectors, mu-nu contraction, and a gluon propagator, diagram 12b
