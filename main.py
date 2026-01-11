@@ -75,18 +75,23 @@ def isgammapm(g):
 def isgammaperp(g):
     return not isgammapm(g)
 def ismu(g):
-	return g == MULABEL
+    return g == MULABEL
 def isnu(g):
-	return g == NULABEL
+    return g == NULABEL
+
+def is4dindex(index):
+    return index[0]=="?"
+def perpfrom4d(index):
+    return index[1:]
+def sanitize(index):
+    if is4dindex(index):
+        return perpfrom4d(index)
+    else:
+        return index
+def issameindex(a,b):
+    return sanitize(a)==sanitize(b)
 
 def combineetas(uppers,lowers):
-    def is4dindex(index):
-        return index[0]=="?"
-    def perpfrom4d(index):
-        return index[1:]
-    def issameindex(a,b):
-        return a==b or (is4dindex(a) and perpfrom4d(a)==b) or (is4dindex(b) and perpfrom4d(b)==a)
-
     #uppers is a list of g^{a b}s
     #lowers is a list of g_{a b}s
     #in actual practical use everything is a perp index
@@ -136,9 +141,6 @@ def combineetas(uppers,lowers):
 
     coeff = 1
     while len(repeatedindices) > 0: #take care of one repeated index
-        # print("ALLGS",allgs)
-        # print("REPEATED",repeatedindices)
-
         currindex = repeatedindices[0]
 
         #find currindex
@@ -146,10 +148,15 @@ def combineetas(uppers,lowers):
         lowergi = -1
         for gi in range(len(allgs)):
             currg = allgs[gi]
-            if currindex in currg[0]:
-                uppergi = gi
-            if currindex in currg[1]:
-                lowergi = gi
+            for gindex in currg[0]:
+            	if issameindex(currindex,gindex):
+            		uppergi = gi
+            for gindex in currg[1]:
+            	if issameindex(currindex,gindex):
+            		lowergi = gi
+
+        if uppergi==-1 or lowergi==-1:
+        	raise ValueError
 
         if lowergi == uppergi: #they're in the same term
             if is4dindex(currindex):
@@ -164,8 +171,6 @@ def combineetas(uppers,lowers):
         else: #contracting two gs
             g1 = allgs[lowergi] #has a _{a}
             g2 = allgs[uppergi] #has a ^{a}
-            # print("\tCONTRACTING",g1,g2)
-
             newg = makegperp(g1[0]+[i for i in g2[0] if not issameindex(i,currindex)] , [i for i in g1[1] if not issameindex(i,currindex)]+g2[1])
 
             allgs.pop(max(lowergi,uppergi))
@@ -177,7 +182,6 @@ def combineetas(uppers,lowers):
         lowerindices = [index for gperp in allgs for index in gperp[1]]
         repeatedindices = [i for i in lowerindices for j in upperindices if issameindex(i,j)]
 
-    # print("AT THE END:",coeff,allgs)
     retguppers = []
     retglowers = []
     retguplows = []
@@ -423,9 +427,9 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
                 i+=1
             elif term[0] == "?": #wildcard index for gluon props
                 #we keep track of the index but there's no associated vector
-                gammas.append(term[1:])
+                gammas.append(term)
                 vectors.append(None)
-                vectorindices.append(term[1:])
+                vectorindices.append(term)
             else: #just a bare gamma matrix
                 gammas.append(term)
 
@@ -482,7 +486,6 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
                 Gterm = Gterms[Gtermi]
                 assert (-1 not in Gmunus[Gtermi])
                 if Gmunus[Gtermi] == [1,1]: #- -
-                    val = (Gterm[0].getperp())**2
                     plusminusGfactors *= (Gterm[0].getperp())**2 / (Gterm[0].getminus())**2                    
                 elif Gmunus[Gtermi] == [1,2]: #- perp
                     perpterms.append((Gterm[1][1], Gterm[0].getperp()))
@@ -491,7 +494,7 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
                     perpterms.append((Gterm[1][0], Gterm[0].getperp()))
                     plusminusGfactors /= Gterm[0].getminus()
                 elif Gmunus[Gtermi] == [2,2]: #perp perp
-                    currglowers.append((Gterm[1][0],Gterm[1][1]))
+                    currglowers.append((Gterm[1][0][1:],Gterm[1][1][1:]))
                     plusminusGfactors *= -1
                 else: #everything else is zero
                     plusminusGfactors = 0
@@ -546,9 +549,9 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
                             vec1 = None
                             vec2 = None
                             for vec in perpterms:
-                                if vec[0] == eta[0]:
+                                if sanitize(vec[0]) == eta[0]:
                                     vec1 = vec[1]
-                                elif vec[0] == eta[1]:
+                                elif sanitize(vec[0]) == eta[1]:
                                     vec2 = vec[1]
 
                             if not (vec1 and vec2):
@@ -726,13 +729,13 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
 #=================================================================================================
 
 #10a
-fulltrace(["+","-",kv+p2v,"\\gamma",kv+p2v+p1pv,lv,kv+p2v+p1v,"\\beta",kv+p2v,"-"], glowers=[ ("\\gamma","\\beta") ])
+#fulltrace(["+","-",kv+p2v,"\\gamma",kv+p2v+p1pv,lv,kv+p2v+p1v,"\\beta",kv+p2v,"-"], glowers=[ ("\\gamma","\\beta") ])
 
 #12a
 #fulltrace(['+','-',kv+p2v,MULABEL,lv-p1pv,'\\gamma',lv,'\\beta',lv-p1v,NULABEL,kv+p2v,'-'], glowers=[ ("\\gamma","\\beta") ])
 
 #12b
-#fulltrace(['-','?\\beta',lv-p1v,NULABEL,p2v+kv,'-','+','-',p2v+kv,MULABEL,lv-p1pv,'?\\gamma'], Gterms=[ (lv,('\\gamma','\\beta')) ])
+#fulltrace(['-','?\\beta',lv-p1v,NULABEL,p2v+kv,'-','+','-',p2v+kv,MULABEL,lv-p1pv,'?\\gamma'], Gterms=[ (lv,('?\\gamma','?\\beta')) ])
 
 #15e
-#fulltrace(['-',lv-kv-p2v,'?\\gamma',kv+p2v,'\\alpha','-','\\beta',kv+p2v,'?\\delta',lv-kv-p2v], Gterms=[ (lv,('\\delta','\\gamma')) ], glowers=[ ("\\alpha","\\beta") ])
+fulltrace(['-',lv-kv-p2v,'?\\gamma',kv+p2v,'\\alpha','-','\\beta',kv+p2v,'?\\delta',lv-kv-p2v], Gterms=[ (lv,('?\\delta','?\\gamma')) ], glowers=[ ("\\alpha","\\beta") ])
