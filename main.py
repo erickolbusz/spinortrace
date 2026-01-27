@@ -61,6 +61,48 @@ kv = lcvec(kp,0,kperp)
 k1v = lcvec(k1p,0,k1perp)
 k2v = lcvec(k2p,0,k2perp)
 
+#=================================================================================================
+# OUTPUT FORMATTING
+#=================================================================================================
+
+def pprint(coeffs,dotprods,ret=False):
+    #should maybe use a regex in the future
+    try:
+        coeffs = coeffs.subs(lm,y*p2)
+        strcoeffs = str(coeffs)
+        if len(coeffs.as_terms()[0])>1 and len(dotprods)>0: #more than one term, bracket it
+            strcoeffs = "[ %s ]"%strcoeffs
+##        print(len(coeffs.as_terms()[0]), dotprods)
+    except AttributeError:
+        strcoeffs = str(coeffs)
+    
+    pretty = strcoeffs.replace(".0","").replace("p_2^-**","(p_2^-)**").replace("**","^").replace("*","")
+
+    for dotprod in dotprods:
+        pretty += make_dot_prod_str(dotprod[0],dotprod[1])
+    if ret:
+        return pretty
+    else:
+        print(pretty + " \\\\")
+
+def make_dot_prod_str(t1,t2):
+    #how many terms in the two vectors being dotted
+    len1 = len(t1.as_terms()[0])
+    len2 = len(t2.as_terms()[0])
+
+    str1 = str(t1)
+    str2 = str(t2)
+
+    if len1>1:
+        str1 = "(%s)"%str1
+    if len2>1:
+        str2 = "(%s)"%str2
+        
+    if len1==1 and len2==1:
+        return "(%s \cdot %s)"%(str1,str2)
+
+    return "[%s \cdot %s]"%(str1,str2)
+
 
 #=================================================================================================
 # HELPERS
@@ -410,6 +452,50 @@ def trace(gammas,symmetries=[]):
 # MAIN
 #================================================================================================= 
 
+def is_same_dot_prods(l1,l2):
+    def is_same_term(t1,t2):
+        a,b = t1
+        c,d = t2
+        if (a==c and b==d) or (a+c==0 and b+d==0) or (a==d and b==c) or (a+d==0 and b+c==0):
+            return (True, 1)
+        if (a+c==0 and b==d) or (a==c and b+d==0) or (a+d==0 and b==c) or (a==d and b+c==0):
+            return (True, -1)
+        return (False, 0)
+    
+    if len(l1)!=len(l2):
+        return (False, 1)
+
+    lenl = len(l1)
+    
+    found = [(False, 0) for _ in range(lenl)]
+    found1 = [False for _ in range(lenl)]
+    found2 = [False for _ in range(lenl)]
+    
+    for term1i in range(lenl):
+        isfound = False
+        for term2i in range(lenl):
+            res = is_same_term(l1[term1i], l2[term2i])
+            if res[0]: #these are the same term
+                isfound = True
+                found[term1i] = res
+                break
+        if not isfound:
+            return (False, 0)
+
+    #everything in found should be (True, +-1)
+    #but just check
+    overallsign = 1
+    for term in found:
+        if term[0]:
+            overallsign *= term[1]
+        else:
+            return (False, 0)
+
+    return (True, overallsign)
+
+
+
+
 def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
     def fulltrace_helper(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
         gammas = [] #label of the gamma matrix
@@ -519,7 +605,6 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
                 # print(plusminusGfactors)
                 # print(currguppers)
                 # print(currglowers)
-                thistermtotal = 0
 
                 for term in vectorterms:
                     if term[0] == 0: #plus component
@@ -528,6 +613,9 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
                         plusminusGfactors *= term[1].getminus()
 
                 if isinstance(currtrace,dict):
+                    #thistermtotal = 0
+                    termstosum = {} #keys are dot products, values are the coefficients
+                    
                     #loop over each term
                     for term in currtrace['terms']:
                         #contract metric tensors as much as we can on their own
@@ -540,11 +628,12 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
                         assert (len(termglowers)==0) 
                         assert (len(termguplows)==0)
 
-                        finalterm = currtrace['overall_factor'] * plusminusGfactors * term[1] * combinedgs['coeff']
-
+                        #have to keep a list of dot products so we know what's dotted with what
+                        finaltermcoeff = currtrace['overall_factor'] * plusminusGfactors * term[1] * combinedgs['coeff']
+                        finaltermdotprods = [] #list of tuples (a,b)
+                        
                         #do the contractions
                         #each adds a minus sign since eta^{perpa perpb} v_aperp w_bperp = -v_perp cdot w_perp
-                        perpcontractions = []
                         for eta in termguppers: #find the two perp indices
                             vec1 = None
                             vec2 = None
@@ -558,25 +647,51 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
                                 print("Couldn't contract index?")
                                 raise SyntaxError
 
-                            dotprod = vec1*vec2
-                            dotprod = simplify(dotprod.subs([
-                                (lperp*kperp, lperpdotkperp),
-                                (lperp*k1perp, lperpdotk1perp),
-                                (lperp*k2perp, lperpdotk2perp),
-                                (k1perp*k2perp, k1perpdotk2perp),
-                                # (lperp*lperp, lperpsq),
-                                # (kperp*kperp, kperpsq),
-                                # (k1perp*k1perp, k1perpsq),
-                                # (k2perp*k2perp, k2perpsq),
-                            ]))
+                            finaltermcoeff *= -1
 
-                            finalterm *= -1
-                            finalterm *= dotprod
+                            if vec1==vec2 or vec1+vec2==0: #same term
+                                finaltermcoeff *= (vec1*vec2) #shows up as e.g. k^2 or (k+p)^2
+                            else:
+                                finaltermdotprods.append((vec1,vec2))
+                                
+##                            dotprod = simplify(dotprod.subs([
+##                                (lperp*kperp, lperpdotkperp),
+##                                (lperp*k1perp, lperpdotk1perp),
+##                                (lperp*k2perp, lperpdotk2perp),
+##                                (k1perp*k2perp, k1perpdotk2perp),
+##                                # (lperp*lperp, lperpsq),
+##                                # (kperp*kperp, kperpsq),
+##                                # (k1perp*k1perp, k1perpsq),
+##                                # (k2perp*k2perp, k2perpsq),
+##                            ]))
+##
+##                            finalterm *= dotprod
 
-                        thistermtotal += finalterm
+                        #thistermtotal += finalterm
+                        isindict = False
+                        for key in termstosum:
+                            comp = is_same_dot_prods(finaltermdotprods, key) #we already have a term like this
+                            if comp[0]:
+                                termstosum[key] += comp[1]*finaltermcoeff #add to the term
+                                isindict = True
+                                break
 
-                    finalanswer += thistermtotal
-                    finalterms.append((possibleindices,thistermtotal))
+                        if not isindict: #new term
+                            termstosum[tuple(finaltermdotprods)] = finaltermcoeff
+                        
+                        #termstosum.append((finaltermcoeff,finaltermdotprods))
+                
+                    #now combine all terms
+                    thistermtotal = 0
+
+                    for key in termstosum:
+                        if termstosum[key] != 0:
+                            finalterms.append({
+                                "indices": possibleindices,
+                                "outstr": pprint(termstosum[key], key, ret=True),
+                                "val": {key: termstosum[key]}
+                            })
+                        #finalterms.append((possibleindices,thistermtotal))
                 else:
                     #just got a float out from the trace
 
@@ -594,27 +709,23 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
 
                     finalterm = currtrace * plusminusGfactors * combinedgs['coeff']
 
-                    finalanswer += finalterm
-                    finalterms.append((possibleindices,finalterm))
+                    #finalanswer += finalterm
+                    #finalterms.append((possibleindices,finalterm))
+                    finalterms.append({
+                        "indices": possibleindices,
+                        "outstr": str(finalterm),
+                        "val": finalterm
+                    })
 
-        return {
-            "allterms": finalterms,
-            "answer": finalanswer
-        }
+##        return {
+##            "allterms": finalterms,
+##            "answer": finalanswer
+##        }
+        return finalterms
 
     #======================================================================================
 
-    def pprint(answer,ret=False):
-        #should maybe use a regex in the future
-        try:
-            answer = answer.subs(lm,y*p2)
-        except AttributeError:
-            pass
-        pretty = str(answer).replace(".0","").replace("p_2^-**","(p_2^-)**").replace("**","^").replace("*","")
-        if ret:
-            return pretty
-        else:
-            print(pretty + " \\\\")
+
 
     #check well formed args, append symmetries
     for Gterm in Gterms: # (vec, (index1, index2))
@@ -660,11 +771,13 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
             result = fulltrace_helper(nonmunuterms,symmetries,Gterms,guppers,glowers)
 
             print("\tALLOWED TERMS:")
-            for term in result['allterms']:
-                print('\t',term[0], '=>', pprint(term[1],ret=True))
+            for term in result:
+                print('\t', term['indices'], '=>', term['outstr'])
             print()
 
-            allsubanswers.append((4,result))
+            
+            allsubanswers.append((4,[term['val'] for term in result]))
+            #allsubanswers.append((4,result))
         else:
             tracei = 1
             sign = 1
@@ -680,16 +793,18 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
                 print("TRACE %d:"%tracei)
                 print(dummyindices)
                 print("\tALLOWED TERMS:")
-                for term in result['allterms']:
-                    print('\t',term[0], '=>', pprint(term[1],ret=True))
+                for term in result:
+                    print('\t', term['indices'], '=>', term['outstr'])
                 print()
 
                 #stop condition has
                 #gamma^mu gamma^A gamma_mu = -2gamma^A
                 if rindex == lindex+2:
-                    allsubanswers.append((-2*sign,result))
+                    #allsubanswers.append((-2*sign,result))
+                    allsubanswers.append((-2*sign,[term['val'] for term in result]))
                 else:
-                    allsubanswers.append((2*sign,result))
+                    #allsubanswers.append((2*sign,result))
+                    allsubanswers.append((2*sign,[term['val'] for term in result]))
 
                 sign*=-1
                 rindex-=1
@@ -709,33 +824,121 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
             sumstr = sumstr[1:]
 
         print(sumstr)
-        overallsum = sum(subtrace[0] * subtrace[1]['answer'] for subtrace in allsubanswers)
-        pprint(overallsum)
 
+        #make the final answer
+        overalldotterms = {} #terms with dot products need to combine them first
+        overallconstterms = 0 #terms without dot product can just add
+
+        for subtrace in allsubanswers:
+            for term in subtrace[1]:
+                if isinstance(term,dict): #has a dot product
+                    for dotprod in term: #only one key
+                        isindict = False
+                        for key in overalldotterms:
+                            comp = is_same_dot_prods(dotprod, key)
+                            if comp[0]: #we already have a term like this
+                                overalldotterms[key] += subtrace[0]*comp[1]*term[dotprod]
+                                isindict = True
+                                break
+
+                        if not isindict: #new term
+                            overalldotterms[dotprod] = subtrace[0]*term[dotprod]
+                else: #no dot product don't need to do all these gymnastics
+                    overallconstterms += term
+
+        #make the strings
+        overallstrs = []
+
+        if overallconstterms != 0:
+            overallstrs.append(pprint(overallconstterms,[],ret=True))
+        
+        for term in overalldotterms:
+            if overalldotterms[term] != 0:
+                overallstrs.append(pprint(overalldotterms[term],term,ret=True))
+                            
+        #overallsum = sum(subtrace[0] * subtrace[1]['answer'] for subtrace in allsubanswers)
+        #pprint(overallsum)
+        finalstr = overallstrs[0]
+        for finalterm in overallstrs[1:]:
+            if finalterm[0] == "-":
+                finalstr += " - %s"%finalterm[1:]
+            else:
+                finalstr += " + %s"%finalterm
+
+        print(finalstr)
     else:
         if MULABEL in terms or NULABEL in terms:
             raise ValueError
 
         result = fulltrace_helper(terms,symmetries,Gterms,guppers,glowers)
         print("ALLOWED TERMS:")
-        for term in result['allterms']:
-            print(term[0], '=>', pprint(term[1],ret=True))
+        for term in result:
+            print('\t', term['indices'], '=>', term['outstr'])
         print()
         print("OVERALL SUM:")
-        pprint(result['answer'])
+        
+        #pprint(result['answer'])
+        #make the final answer
+        overalldotterms = {} #terms with dot products need to combine them first
+        overallconstterms = 0 #terms without dot product can just add
 
+        for termdict in result:
+            term = termdict['val']
+            if isinstance(term,dict): #has a dot product
+                for dotprod in term: #only one key
+                    isindict = False
+                    for key in overalldotterms:
+                        comp = is_same_dot_prods(dotprod, key)
+                        if comp[0]: #we already have a term like this
+                            overalldotterms[key] += comp[1]*term[dotprod]
+                            isindict = True
+                            break
+
+                    if not isindict: #new term
+                        overalldotterms[dotprod] = term[dotprod]
+            else: #no dot product don't need to do all these gymnastics
+                overallconstterms += term
+
+        #make the strings
+        overallstrs = []
+
+        if overallconstterms != 0:
+            overallstrs.append(pprint(overallconstterms,[],ret=True))
+            
+        for term in overalldotterms:
+            if overalldotterms[term] != 0:
+                overallstrs.append(pprint(overalldotterms[term],term,ret=True))
+                            
+        #overallsum = sum(subtrace[0] * subtrace[1]['answer'] for subtrace in allsubanswers)
+        #pprint(overallsum)
+        finalstr = overallstrs[0]
+        for finalterm in overallstrs[1:]:
+            if finalterm[0] == "-":
+                finalstr += " - %s"%finalterm[1:]
+            else:
+                finalstr += " + %s"%finalterm
+
+##        print("!!")
+##        for _ in overallstrs:
+##            print(_)
+##        print("!!")
+        print(finalstr)
 
 #=================================================================================================
 #=================================================================================================
 
 #10a
-#fulltrace(["+","-",kv+p2v,"\\gamma",kv+p2v+p1pv,lv,kv+p2v+p1v,"\\beta",kv+p2v,"-"], glowers=[ ("\\gamma","\\beta") ])
+fulltrace(["+","-",kv+p2v,"\\gamma",kv+p2v+p1pv,lv,kv+p2v+p1v,"\\beta",kv+p2v,"-"], glowers=[ ("\\gamma","\\beta") ])
 
 #12a
-#fulltrace(['+','-',kv+p2v,MULABEL,lv-p1pv,'\\gamma',lv,'\\beta',lv-p1v,NULABEL,kv+p2v,'-'], glowers=[ ("\\gamma","\\beta") ])
+fulltrace(['+','-',kv+p2v,MULABEL,lv-p1pv,'\\gamma',lv,'\\beta',lv-p1v,NULABEL,kv+p2v,'-'], glowers=[ ("\\gamma","\\beta") ])
 
 #12b
-#fulltrace(['-','?\\beta',lv-p1v,NULABEL,p2v+kv,'-','+','-',p2v+kv,MULABEL,lv-p1pv,'?\\gamma'], Gterms=[ (lv,('?\\gamma','?\\beta')) ])
+fulltrace(['-','?\\beta',lv-p1v,NULABEL,p2v+kv,'-','+','-',p2v+kv,MULABEL,lv-p1pv,'?\\gamma'], Gterms=[ (lv,('?\\gamma','?\\beta')) ])
 
 #15e
 fulltrace(['-',lv-kv-p2v,'?\\gamma',kv+p2v,'\\alpha','-','\\beta',kv+p2v,'?\\delta',lv-kv-p2v], Gterms=[ (lv,('?\\delta','?\\gamma')) ], glowers=[ ("\\alpha","\\beta") ])
+
+
+#fulltrace(['+','-','a','b'],glowers=[ ("a","b") ])
+#fulltrace(['+','-'])
