@@ -844,7 +844,7 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
                         if not isindict: #new term
                             overalldotterms[dotprod] = subtrace[0]*term[dotprod]
                 else: #no dot product don't need to do all these gymnastics
-                    overallconstterms += term
+                    overallconstterms += subtrace[0]*term
 
         #make the strings
         overallstrs = []
@@ -928,16 +928,16 @@ def fulltrace(terms,symmetries=[],Gterms=[],guppers=[],glowers=[]):
 #=================================================================================================
 
 #10a
-fulltrace(["+","-",kv+p2v,"\\gamma",kv+p2v+p1pv,lv,kv+p2v+p1v,"\\beta",kv+p2v,"-"], glowers=[ ("\\gamma","\\beta") ])
+#fulltrace(["+","-",kv+p2v,"\\gamma",kv+p2v+p1pv,lv,kv+p2v+p1v,"\\beta",kv+p2v,"-"], glowers=[ ("\\gamma","\\beta") ])
 
 #12a
-fulltrace(['+','-',kv+p2v,MULABEL,lv-p1pv,'\\gamma',lv,'\\beta',lv-p1v,NULABEL,kv+p2v,'-'], glowers=[ ("\\gamma","\\beta") ])
+#fulltrace(['+','-',kv+p2v,MULABEL,lv-p1pv,'\\gamma',lv,'\\beta',lv-p1v,NULABEL,kv+p2v,'-'], glowers=[ ("\\gamma","\\beta") ])
 
 #12b
 fulltrace(['-','?\\beta',lv-p1v,NULABEL,p2v+kv,'-','+','-',p2v+kv,MULABEL,lv-p1pv,'?\\gamma'], Gterms=[ (lv,('?\\gamma','?\\beta')) ])
 
 #15e
-fulltrace(['-',lv-kv-p2v,'?\\gamma',kv+p2v,'\\alpha','-','\\beta',kv+p2v,'?\\delta',lv-kv-p2v], Gterms=[ (lv,('?\\delta','?\\gamma')) ], glowers=[ ("\\alpha","\\beta") ])
+#fulltrace(['-',lv-kv-p2v,'?\\gamma',kv+p2v,'\\alpha','-','\\beta',kv+p2v,'?\\delta',lv-kv-p2v], Gterms=[ (lv,('?\\delta','?\\gamma')) ], glowers=[ ("\\alpha","\\beta") ])
 
 
 #fulltrace(['+','-','a','b'],glowers=[ ("a","b") ])
