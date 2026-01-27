@@ -15,6 +15,12 @@ The main function is `fulltrace` which takes the arguments:
 
 The program loops over all possibilities for the indices and computes each term, then prints the sum in LaTeX code.
 
+Any product of two perp vectors should always be interpreted as a normal cartesian dot product i.e.
+
+```math
+(k_{\perp} + p_{2\perp})\cdot (l_{\perp} - p_{1\perp}) \equiv +(k_{\perp_1} + p_{2\perp_1})(l_{\perp_1} - p_{1\perp_1}) + (k_{\perp_2} + p_{2\perp_2})(l_{\perp_2} - p_{1\perp_2})
+```
+
 ## 4-Vectors
 
 Vectors are defined as instances of the `lcvec` class. Vector components should first be defined as sympy symbols (see the definition of `p1`, etc.) then the vector is defined from its $+,-,\perp$ components as e.g. `p2v = lcvec(0,p2,p2perp)`. The following vectors are included by default:
@@ -43,12 +49,6 @@ If the trace includes a (non-perp) $\gamma^\mu$ and $\gamma^\nu$ that are contra
 ## Quirks/Bugs
 
 - Currently wildcard indices are only useful for gluon propagators. They are not fully supported for use with `guppers` or `glowers` (though the code is technically there already). This shouldn't matter because currently the only non-perp metric tensors being contracted is $g_{\mu\nu}$.
-- Sometimes a dot product will not have a `\cdot` between the two terms, see for example the second term in the last example shown here. Any product of two perp vectors should always be interpreted as a normal cartesian dot product i.e.
-
-```math
-(k_{\perp} + p_{2\perp})(l_{\perp} - p_{1\perp}) \equiv (k_{\perp} + p_{2\perp})\cdot (l_{\perp} - p_{1\perp}) \equiv +(k_{\perp_1} + p_{2\perp_1})(l_{\perp_1} - p_{1\perp_1}) + (k_{\perp_2} + p_{2\perp_2})(l_{\perp_2} - p_{1\perp_2})
-```
-
 
 ---
 
@@ -72,7 +72,7 @@ With 4-vectors and mu-nu contraction:
 
 `fulltrace(['+',MULABEL,kv,lv,NULABEL,'-'])`
 ```math
-\textrm{tr}\,\left[\gamma^+\gamma^\mu k\!\!\!\!/ l\!\!\!\!\!\:/ \gamma^\nu \gamma^-\right]g_{\mu\nu} = -16(l_{\perp}\cdot k_{\perp}) + 16k^+p_2^-y
+\textrm{tr}\,\left[\gamma^+\gamma^\mu k\!\!\!\!/ l\!\!\!\!\!\:/ \gamma^\nu \gamma^-\right]g_{\mu\nu} = 16k^+p_2^-y - 16(l_{\perp} \cdot k_{\perp})
 ```
 
 With 4-vectors, mu-nu contraction, and a gluon propagator, diagram 12b:
@@ -81,6 +81,6 @@ With 4-vectors, mu-nu contraction, and a gluon propagator, diagram 12b:
 ```math
 \begin{align}
 &\textrm{tr}\,\left[\gamma^-\gamma^{\beta}(l\!\!\!\!\!\:/-p_1\!\!\!\!\!\!\!/)\gamma^\nu(p_2\!\!\!\!\!\!\!/+k\!\!\!\!/)\gamma^-\gamma^+\gamma^-(p_2\!\!\!\!\!\!\!/+k\!\!\!\!/)\gamma^\mu(l\!\!\!\!\!\:/-p_1'\!\!\!\!\!\!\!/\gamma^\gamma) \right]G_{\gamma\beta}(l) g_{\mu\nu} \\
-&\hspace{30em}= -64(p_2^-)^2y^2(k_{\perp} + p_{2\perp})^2 + 128(p_2^-)^2y(k_{\perp} + p_{2\perp})(l_{\perp} - p_{1\perp}) - 64(p_2^-)^2(l_{\perp} - p_{1\perp})^2
+&\hspace{30em}= -64(p_2^-)^2y^2(k_{\perp} + p_{2\perp})^2 - 64(p_2^-)^2(l_{\perp} - p_{1\perp})^2 + 128(p_2^-)^2y[(l_{\perp} - p_{1\perp}) \cdot (k_{\perp} + p_{2\perp})]
 \end{align}
 ```
