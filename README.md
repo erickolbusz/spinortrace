@@ -46,9 +46,12 @@ To properly include a gluon term, the associated indices in `terms` **must** sta
 
 If the trace includes a (non-perp) $\gamma^\mu$ and $\gamma^\nu$ that are contracted with a $g_{\mu\nu}$, use `MULABEL` and `NULABEL` in `terms` and the contraction will automatically be calculated by anticommuting the two until they are consecutive terms.
 
-## Quirks/Bugs
+## Quirks/Bugs/Todos
 
 - Currently wildcard indices are only useful for gluon propagators. They are not fully supported for use with `guppers` or `glowers` (though the code is technically there already). This shouldn't matter because currently the only non-perp metric tensors being contracted is $g_{\mu\nu}$.
+- Similar to above: sometimes the program complains about contractions of full 4d metric tensors. (note for self: e.g. 18e trace trick -- need sanitize4d(eta[i]) circa line 643 and 645)
+- (Lower) Gluon propagator indices can only contract with (upper) gamma matrix indices, not guppers.
+- Only one trace can be done
 
 ---
 
